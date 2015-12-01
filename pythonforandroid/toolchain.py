@@ -2983,29 +2983,23 @@ class ToolchainCL(Command):
             self._ctx = Context()
         return self._ctx
 
-    def recipes(self, args):
-        parser = argparse.ArgumentParser(
-                description="List all the available recipes")
-        parser.add_argument(
+    class recipes(SubCommand):
+        description = help = "List all the available recipes"
+
+        def cli(self):
+            self.add_argument(
                 "--compact", action="store_true", default=False,
                 help="Produce a compact list suitable for scripting")
 
-        add_boolean_option(
-            parser, ["color"],
-            default=True,
-            description='Whether the output should be colored:')
+            self.add_boolean_option(
+                ["color"],
+                default=True,
+                description='Whether the output should be colored:')
 
-        args = parser.parse_args(args)
-
-        Fore = Out_Fore
-        Style = Out_Style
-        if not args.color:
-            Fore = Null_Fore
-            Style = Null_Style
-
-        if args.compact:
-            print(" ".join(list(Recipe.list_recipes())))
-        else:
+        def run(self, args):
+            if args.compact:
+                print(" ".join(list(Recipe.list_recipes())))
+                return
             ctx = self.ctx
             for name in sorted(Recipe.list_recipes()):
                 recipe = Recipe.get_recipe(name, ctx)
@@ -3020,12 +3014,14 @@ class ToolchainCL(Command):
                     stdout.p('    {R}conflicts: {recipe.conflicts}{c}',
                              recipe=recipe)
 
-    def bootstraps(self, args):
-        '''List all the bootstraps available to build with.'''
-        for bs in Bootstrap.list_bootstraps():
-            bs = Bootstrap.get_bootstrap(bs, self.ctx)
-            stdout.p('{B}{X}{bs.name}{C}', bs=bs)
-            stdout.p('    {G}depends: {bs.recipe_depends}{c}', bs=bs)
+    class bootstraps(SubCommand):
+        description = help = 'List all the bootstraps available to build with.'
+
+        def run(self, args):
+            for bs in Bootstrap.list_bootstraps():
+                bs = Bootstrap.get_bootstrap(bs, self.tc.ctx)
+                stdout.p('{B}{X}{bs.name}{C}', bs=bs)
+                stdout.p('    {G}depends: {bs.recipe_depends}{c}', bs=bs)
 
     def clean_all(self, args):
         '''Delete all build components; the package cache, package builds,
