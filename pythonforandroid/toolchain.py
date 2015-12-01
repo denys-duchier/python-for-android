@@ -2797,7 +2797,7 @@ class BaseCommand(six.with_metaclass(CommandMetaclass)):
 class Command(BaseCommand):
 
     def __init__(self):
-        super(MainCommand, self).__init__()
+        super(Command, self).__init__()
         # create the parser
         self._create_parser()
         # populate it with argument parsers
@@ -2862,53 +2862,29 @@ class SubCommand(Command):
         pass
 
 
-class ToolchainCL(object):
+class ToolchainCL(Command):
+
+    description = "Tool for managing the Android / Python toolchain"
 
     def __init__(self):
+        super(ToolchainCL, self).__init__()
         self._ctx = None
 
-        parser = argparse.ArgumentParser(
-                description="Tool for managing the Android / Python toolchain",
-                usage="""toolchain <command> [<args>]
-
-Available commands:
-adb           Runs adb binary from the detected SDK dir
-apk           Create an APK using the given distribution
-bootstraps    List all the bootstraps available to build with.
-build_status  Informations about the current build
-create        Build an android project with all recipes
-clean_all     Delete all build components
-clean_builds  Delete all build caches
-clean_dists   Delete all compiled distributions
-clean_download_cache Delete any downloaded recipe packages
-clean_recipe_build   Delete the build files of a recipe
-distributions List all distributions
-export_dist   Copies a created dist to an output directory
-logcat        Runs logcat from the detected SDK dir
-print_context_info   Prints debug informations
-recipes       List all the available recipes
-sdk_tools     Runs android binary from the detected SDK dir
-symlink_dist  Symlinks a created dist to an output directory
-
-Planned commands:
-build_dist
-""")
-        parser.add_argument("command", help="Command to run")
-
+    def cli(self):
         # General options
-        parser.add_argument(
+        self.add_argument(
             '--debug', dest='debug', action='store_true',
             help='Display debug output and all build info')
-        parser.add_argument(
+        self.add_argument(
             '--sdk_dir', dest='sdk_dir', default='',
             help='The filepath where the Android SDK is installed')
-        parser.add_argument(
+        self.add_argument(
             '--ndk_dir', dest='ndk_dir', default='',
             help='The filepath where the Android NDK is installed')
-        parser.add_argument(
+        self.add_argument(
             '--android_api', dest='android_api', default=0, type=int,
             help='The Android API level to build against.')
-        parser.add_argument(
+        self.add_argument(
             '--ndk_version', dest='ndk_version', default='',
             help=('The version of the Android NDK. This is optional, '
                   'we try to work it out automatically from the ndk_dir.'))
@@ -2922,38 +2898,38 @@ build_dist
             default='armeabi')
 
         # Options for specifying the Distribution
-        parser.add_argument(
+        self.add_argument(
             '--dist_name',
             help='The name of the distribution to use or create',
             default='')
-        parser.add_argument(
+        self.add_argument(
             '--requirements',
             help=('Dependencies of your app, should be recipe names or '
                   'Python modules'),
             default='')
 
-        add_boolean_option(
-            parser, ["allow-download"],
+        self.add_boolean_option(
+            ["allow-download"],
             default=False,
             description='Whether to allow binary dist download:')
 
-        add_boolean_option(
-            parser, ["allow-build"],
+        self.add_boolean_option(
+            ["allow-build"],
             default=True,
             description='Whether to allow compilation of a new distribution:')
 
-        add_boolean_option(
-            parser, ["force-build"],
+        self.add_boolean_option(
+            ["force-build"],
             default=False,
             description='Whether to force compilation of a new distribution:')
 
-        parser.add_argument(
+        self.add_argument(
             '--extra-dist-dirs', '--extra_dist_dirs',
             dest='extra_dist_dirs', default='',
             help='Directories in which to look for distributions')
 
-        add_boolean_option(
-            parser, ["require-perfect-match"],
+        self.add_boolean_option(
+            ["require-perfect-match"],
             default=False,
             description=('Whether the dist recipes must perfectly match '
                          'those requested'))
@@ -2961,7 +2937,7 @@ build_dist
 
         self._read_configuration()
 
-        args, unknown = parser.parse_known_args(sys.argv[1:])
+    def before_run(self, args):
         self.dist_args = args
 
         if args.debug:
@@ -2987,11 +2963,6 @@ build_dist
         #             'handled, exiting.')
         #     exit(1)
 
-        if not hasattr(self, args.command):
-            print('Unrecognized command')
-            parser.print_help()
-            exit(1)
-        getattr(self, args.command)(unknown)
 
     def _read_configuration(self):
         # search for a .p4a configuration file in the current directory
@@ -3354,7 +3325,7 @@ build_dist
 
 
 def main():
-    ToolchainCL()
+    ToolchainCL().run()
 
 if __name__ == "__main__":
     main()
