@@ -8,6 +8,7 @@ This tool intend to replace all the previous tools/ in shell script.
 
 from __future__ import print_function
 
+import six
 import sys
 from sys import stdout, stderr, platform
 from os.path import (join, dirname, realpath, exists, isdir, basename,
@@ -42,6 +43,7 @@ except ImportError:
     from urllib.parse import urlparse
 
 import argparse
+import inspect
 from appdirs import user_data_dir
 import sh
 
@@ -2743,6 +2745,121 @@ def split_argument_list(l):
     if not len(l):
         return []
     return re.split(r'[ ,]*', l)
+
+
+class CommandMetaclass(type):
+    # the CommandMetaclass extracts all subcommand (class) definitions
+    # and stores the dict of them on the class's _subcommands attribute
+
+    def __new__(cls, name, bases, attrs):
+        # find subcommand definitions in base classes
+        sc = {}
+        for b in reversed(bases):
+            sc.update(getattr(b, '_subcommands', {}))
+        # process subcommand definitions in attrs
+        sc_items = {(k, v) for k, v in attrs.items()
+                    if inspect.isclass(v) and issubclass(v, SubCommand)}
+        sc_dict = {(v.name or k.replace("_", "-")): v for k, v in sc_items}
+        sc.update(sc_dict)
+        for k, _ in sc_items:
+            del attrs[k]
+        new_cls = super(CommandMetaclass, cls).__new__(cls, name, bases, attrs)
+        new_cls._subcommands = sc
+        return new_cls
+
+
+class BaseCommand(six.with_metaclass(CommandMetaclass)):
+    """Base class for cli commands (whether main or sub).
+    """
+    description = None
+
+    def add_argument(self, *args, **kwargs):
+        """use this in the cli methid to add argument parsers."""
+        self._parser.add_argument(*args, **kwargs)
+
+    def set_default(self, **kwargs):
+        """use this in the cli method to set an argument default."""
+        self._parser.set_defaults(**kwargs)
+
+    def add_boolean_option(self, *args, **kwargs):
+        """use this to add both --foo and --no-foo for a boolean option."""
+        add_boolean_option(self._parser, *args, **kwargs)
+
+    def cli(self):
+        """override to add argument parsers to the command parser."""
+        pass
+
+    def run(self, args):
+        """override to perform the command's job."""
+        pass
+
+
+class Command(BaseCommand):
+
+    def __init__(self):
+        super(MainCommand, self).__init__()
+        # create the parser
+        self._create_parser()
+        # populate it with argument parsers
+        self.cli()
+        # plug subcommands in, if any
+        if self._subcommands:
+            subparsers = self._parser.add_subparsers(title="subcommands")
+        for k, v in self._subcommands.items():
+            subcmd = v(
+                self.tc,        # toolchain instance
+                subparsers.add_parser(
+                    k, description=v.description, help=v.help
+                    # aliases are not widely supported in currently deployed
+                    # versions of argparse
+                    # , aliases=v.aliases
+                ))
+
+    def _create_parser(self):
+        self._parser = argparse.ArgumentParser(
+            description=self.description)
+        # for the main command, the toolchain object is itself
+        self.tc = self
+
+    def run(self):
+        args, unknown = self._parser.parse_known_args()
+        if unknown and not args._cmd.allow_unknown:
+            self._parser.error(
+                'unrecognized arguments: %s' % ' '.join(unknown))
+        self.unknown_args = unknown
+        self.dist_args = args
+        self.before_run(args)
+        args._cmd.before_run(args)
+        if args._cmd.allow_unknown:
+            args._cmd.run(args, unknown)
+        else:
+            args._cmd.run(args)
+
+    def before_run(self, args):
+        pass
+
+
+class SubCommand(Command):
+    name = None
+    aliases = None
+    allow_unknown = False
+    help = None
+
+    def __init__(self, toolchain, parser):
+        self.tc = toolchain
+        self._parser = parser
+        super(SubCommand, self).__init__()
+        parser.set_defaults(_cmd=self)
+
+    def _create_parser(self):
+        # the parser has already been created by the host command
+        # and the tc (toolchain) attribute has been set
+        pass
+
+    # if allow_unknown is false, you can leave "unknown" out from
+    # the parameter list
+    def run(self, args, unknown=()):
+        pass
 
 
 class ToolchainCL(object):
