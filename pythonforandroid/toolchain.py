@@ -3023,38 +3023,45 @@ class ToolchainCL(Command):
                 stdout.p('{B}{X}{bs.name}{C}', bs=bs)
                 stdout.p('    {G}depends: {bs.recipe_depends}{c}', bs=bs)
 
-    def clean_all(self, args):
+    class clean_all(SubCommand):
         '''Delete all build components; the package cache, package builds,
         bootstrap builds and distributions.'''
         parser = argparse.ArgumentParser(
                 description="Clean the build cache, downloads and dists")
-        parsed_args = parser.parse_args(args)
-        ctx = Context()
-        self.clean_dists(args)
-        self.clean_builds(args)
-        self.clean_download_cache(args)
 
-    def clean_dists(self, args):
-        '''Delete all compiled distributions in the internal distribution
-        directory.'''
-        parser = argparse.ArgumentParser(
-                description="Delete any distributions that have been built.")
-        args = parser.parse_args(args)
+        def run(self, args):
+            ctx = Context()
+            self.tc._clean_dists(args)
+            self.tc._clean_builds(args)
+            self.tc._clean_download_cache(args)
+
+    class clean_dists(SubCommand):
+        description = '''Delete all compiled distributions in the internal
+        distribution directory.'''
+        help = "Delete any distributions that have been built."
+
+        def run(self, args):
+            self.tc._clean_dists(args)
+
+    def _clean_dists(self, args):
         ctx = Context()
         if exists(ctx.dist_dir):
             shutil.rmtree(ctx.dist_dir)
 
-    def clean_builds(self, args):
-        '''Delete all build caches for each recipe, python-install, java code
-        and compiled libs collection.
+    class clean_builds(SubCommand):
+        description = '''Delete all build caches for each recipe,
+        python-install, java code and compiled libs collection.
 
         This does *not* delete the package download cache or the final
         distributions.  You can also use clean_recipe_build to delete the build
         of a specific recipe.
         '''
-        parser = argparse.ArgumentParser(
-                description="Delete all build files (but not download caches)")
-        args = parser.parse_args(args)
+        help = "Delete all build files (but not download caches)"
+
+        def run(self, args):
+            self.tc._clean_builds(args)
+
+    def _clean_builds(self, args):
         ctx = Context()
         # if exists(ctx.dist_dir):
         #     shutil.rmtree(ctx.dist_dir)
@@ -3084,15 +3091,17 @@ class ToolchainCL(Command):
         info('Cleaning build for {} recipe.'.format(recipe.name))
         recipe.clean_build()
 
-    def clean_download_cache(self, args):
-        '''
-        Deletes any downloaded recipe packages.
+    class clean_download_cache(SubCommand):
+        description = '''Deletes any downloaded recipe packages.
 
         This does *not* delete the build caches or final distributions.
         '''
-        parser = argparse.ArgumentParser(
-                description="Delete all download caches")
-        args = parser.parse_args(args)
+        help = "Delete all download caches"
+
+        def run(self, args):
+            self.tc._clean_download_cache(args)
+
+    def _clean_download_cache(self, args):
         ctx = Context()
         if exists(ctx.packages_path):
             shutil.rmtree(ctx.packages_path)
