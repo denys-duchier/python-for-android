@@ -3201,12 +3201,14 @@ class ToolchainCL(Command):
                      'just built {}'.format(apks[-1]))
             shprint(sh.cp, apks[-1], './')
 
-    @require_prebuilt_dist
-    def create(self, args):
-        '''Create a distribution directory if it doesn't already exist, run
-        any recipes if necessary, and build the apk.
+    class create(SubCommand):
+        description = '''Create a distribution directory if it doesn't already
+        exist, run any recipes if necessary, and build the apk.
         '''
-        pass  # The decorator does this for us
+
+        @require_prebuilt_dist
+        def run(self, args):
+            pass  # The decorator does this for us
         # ctx = self.ctx
 
         # dist = dist_from_args(ctx, self.dist_args)
