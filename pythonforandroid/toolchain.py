@@ -353,13 +353,12 @@ def require_prebuilt_dist(func):
 
     @wraps(func)
     def wrapper_func(self, args):
-        ctx = self.ctx
-        ctx.set_archs(self._archs)
-        ctx.prepare_build_environment(user_sdk_dir=self.sdk_dir,
-                                      user_ndk_dir=self.ndk_dir,
-                                      user_android_api=self.android_api,
-                                      user_ndk_ver=self.ndk_version)
-        dist = self._dist
+        ctx = self.tc.ctx
+        ctx.prepare_build_environment(user_sdk_dir=self.tc.sdk_dir,
+                                      user_ndk_dir=self.tc.ndk_dir,
+                                      user_android_api=self.tc.android_api,
+                                      user_ndk_ver=self.tc.ndk_version)
+        dist = self.tc._dist
         if dist.needs_build:
             info_notify('No dist exists that meets your requirements, '
                         'so one will be built.')
