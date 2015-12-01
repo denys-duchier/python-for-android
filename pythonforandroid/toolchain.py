@@ -3073,8 +3073,8 @@ class ToolchainCL(Command):
         if exists(libs_dir):
             shutil.rmtree(libs_dir)
 
-    def clean_recipe_build(self, args):
-        '''Deletes the build files of the given recipe.
+    class clean_recipe_build(SubCommand):
+        description = '''Deletes the build files of the given recipe.
 
         This is intended for debug purposes, you may experience
         strange behaviour or problems with some recipes (if their
@@ -3082,14 +3082,15 @@ class ToolchainCL(Command):
         clean_builds, or attempt to clean other recipes until things
         work again.
         '''
-        parser = argparse.ArgumentParser(
-            description="Delete all build files for the given recipe name.")
-        parser.add_argument('recipe', help='The recipe name')
-        args = parser.parse_args(args)
+        help = "Delete all build files for the given recipe name."
 
-        recipe = Recipe.get_recipe(args.recipe, self.ctx)
-        info('Cleaning build for {} recipe.'.format(recipe.name))
-        recipe.clean_build()
+        def cli(self):
+            self.add_argument('recipe', help='The recipe name')
+
+        def run(self, args):
+            recipe = Recipe.get_recipe(args.recipe, self.tc.ctx)
+            info('Cleaning build for {} recipe.'.format(recipe.name))
+            recipe.clean_build()
 
     class clean_download_cache(SubCommand):
         description = '''Deletes any downloaded recipe packages.
