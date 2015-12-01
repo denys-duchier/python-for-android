@@ -3165,41 +3165,42 @@ class ToolchainCL(Command):
         dist = dist_from_args(ctx, self.dist_args)
         return dist
 
-    @require_prebuilt_dist
-    def apk(self, args):
-        '''Create an APK using the given distribution.'''
+    class apk(SubCommand):
+        description = help = 'Create an APK using the given distribution.'
 
         # AND: Need to add a parser here for any extra options
         # parser = argparse.ArgumentParser(
         #     description='Build an APK')
         # args = parser.parse_args(args)
 
-        ctx = self.ctx
-        dist = self._dist
+        @require_prebuilt_dist
+        def run(self, args):
+            ctx = self.tc.ctx
+            dist = self.tc._dist
 
-        # Manually fixing these arguments at the string stage is
-        # unsatisfactory and should probably be changed somehow, but
-        # we can't leave it until later as the build.py scripts assume
-        # they are in the current directory.
-        for i, arg in enumerate(args[:-1]):
-            if arg in ('--dir', '--private'):
-                args[i+1] = realpath(expanduser(args[i+1]))
+            # Manually fixing these arguments at the string stage is
+            # unsatisfactory and should probably be changed somehow, but
+            # we can't leave it until later as the build.py scripts assume
+            # they are in the current directory.
+            for i, arg in enumerate(args[:-1]):
+                if arg in ('--dir', '--private'):
+                    args[i+1] = realpath(expanduser(args[i+1]))
 
-        build = imp.load_source('build', join(dist.dist_dir, 'build.py'))
-        with current_directory(dist.dist_dir):
-            build.parse_args(args)
-            shprint(sh.ant, 'debug', _tail=20, _critical=True)
+            build = imp.load_source('build', join(dist.dist_dir, 'build.py'))
+            with current_directory(dist.dist_dir):
+                build.parse_args(args)
+                shprint(sh.ant, 'debug', _tail=20, _critical=True)
 
-        # AND: This is very crude, needs improving. Also only works
-        # for debug for now.
-        info_main('# Copying APK to current directory')
-        apks = glob.glob(join(dist.dist_dir, 'bin', '*-*-debug.apk'))
-        if len(apks) == 0:
-            raise ValueError('Couldn\'t find the built APK')
-        if len(apks) > 1:
-            info('More than one built APK found...guessing you '
-                 'just built {}'.format(apks[-1]))
-        shprint(sh.cp, apks[-1], './')
+            # AND: This is very crude, needs improving. Also only works
+            # for debug for now.
+            info_main('# Copying APK to current directory')
+            apks = glob.glob(join(dist.dist_dir, 'bin', '*-*-debug.apk'))
+            if len(apks) == 0:
+                raise ValueError('Couldn\'t find the built APK')
+            if len(apks) > 1:
+                info('More than one built APK found...guessing you '
+                     'just built {}'.format(apks[-1]))
+            shprint(sh.cp, apks[-1], './')
 
     @require_prebuilt_dist
     def create(self, args):
