@@ -3131,29 +3131,29 @@ class ToolchainCL(Command):
                 exit(1)
             shprint(sh.cp, '-r', dist.dist_dir, args.output)
 
-    @require_prebuilt_dist
-    def symlink_dist(self, args):
-        '''Symlinks a created dist to an output dir.
+    class symlink_dist(SubCommand):
+        description = '''Symlinks a created dist to an output dir.
 
         This makes it easy to navigate to the dist to investigate it
         or call build.py, though you do not in general need to do this
         and can use the apk command instead.
-
         '''
-        parser = argparse.ArgumentParser(
-            description='Symlink a created dist to a given directory')
-        parser.add_argument('--output', help=('The output dir to copy to'),
-                            required=True)
-        args = parser.parse_args(args)
+        help = 'Symlink a created dist to a given directory'
 
-        ctx = self.ctx
-        dist = dist_from_args(ctx, self.dist_args)
-        if dist.needs_build:
-            info('You asked to symlink a dist, but there is no dist '
-                 'with suitable recipes available. For now, you must '
-                 'create one first with the create argument.')
-            exit(1)
-        shprint(sh.ln, '-s', dist.dist_dir, args.output)
+        def cli(self):
+            self.add_argument('--output', help=('The output dir to copy to'),
+                              required=True)
+
+        @require_prebuilt_dist
+        def run(self, args):
+            ctx = self.tc.ctx
+            dist = dist_from_args(ctx, self.tc.dist_args)
+            if dist.needs_build:
+                info('You asked to symlink a dist, but there is no dist '
+                     'with suitable recipes available. For now, you must '
+                     'create one first with the create argument.')
+                exit(1)
+            shprint(sh.ln, '-s', dist.dist_dir, args.output)
 
     # def _get_dist(self):
     #     ctx = self.ctx
