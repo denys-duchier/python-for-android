@@ -63,21 +63,76 @@ class colorama_shim(object):
 
 Null_Style = Null_Fore = colorama_shim()
 
-if stdout.isatty():
-    Out_Style = Colo_Style
-    Out_Fore = Colo_Fore
-else:
-    Out_Style = Null_Style
-    Out_Fore = Null_Fore
 
-if stderr.isatty():
-    Err_Style = Colo_Style
-    Err_Fore = Colo_Fore
-else:
-    Err_Style = Null_Style
-    Err_Fore = Null_Fore
-Fore = Colo_Fore
-Style = Colo_Style
+class ColorizedStream(object):
+
+    def __init__(self, stream):
+        self._stream = stream
+        if stream.isatty():
+            self.style = Colo_Style
+            self.fore = Colo_Fore
+        else:
+            self.style = Null_Style
+            self.fore = Null_Fore
+        self._format_env = None
+
+    def __getattr__(self, a):
+        return getattr(self._stream, a)
+
+    _LOCAL_ATTRS = ('style', 'fore', '_stream', '_format_env')
+
+    def __setattr__(self, a, v):
+        if a in self._LOCAL_ATTRS:
+            self.__dict__[a] = v
+        else:
+            setattr(self._stream, a, v)
+
+    def color_off(self):
+        self.style = Null_Style
+        self.fore = Null_Fore
+        self._format_env = None
+
+    @property
+    def format_env(self):
+        e = self._format_env
+        if e is None:
+            e = self._format_env = {
+                "R": self.fore.RED,
+                "G": self.fore.GREEN,
+                "B": self.fore.BLUE,
+                "K": self.fore.BLACK,
+                "CY": self.fore.CYAN,
+                "r": self.fore.LIGHTRED_EX,
+                "g": self.fore.LIGHTGREEN_EX,
+                "b": self.fore.LIGHTBLUE_EX,
+                "k": self.fore.LIGHTBLACK_EX,
+                "C": self.style.RESET_ALL,
+                "c": self.fore.RESET,
+                "X": self.style.BRIGHT,
+            }
+        return e
+
+    @property
+    def _(self):
+        return self.format_env
+
+    def p_(self, msg, end="\n", flush=True):
+        self.write(msg)
+        if end:
+            self.write(end)
+        if flush:
+            self.flush()
+
+    def p(self, _msg, end="\n", flush=True, **kwargs):
+        self.p_(self.format(_msg, **kwargs))
+
+    def format(self, _msg, **kwargs):
+        kwargs.update(self.format_env)
+        return _msg.format(**kwargs)
+
+
+stdout = ColorizedStream(stdout)
+stderr = ColorizedStream(stderr)
 
 user_dir = dirname(realpath(os.path.curdir))
 toolchain_dir = dirname(__file__)
@@ -89,21 +144,17 @@ DEFAULT_ANDROID_API = 15
 
 class LevelDifferentiatingFormatter(logging.Formatter):
     def format(self, record):
-        if record.levelno > 30:
-            record.msg = '{}{}[ERROR]{}{}:   '.format(
-                Err_Style.BRIGHT, Err_Fore.RED, Err_Fore.RESET,
-                Err_Style.RESET_ALL) + record.msg
-        elif record.levelno > 20:
-            record.msg = '{}{}[WARNING]{}{}: '.format(
-                Err_Style.BRIGHT, Err_Fore.RED, Err_Fore.RESET,
-                Err_Style.RESET_ALL) + record.msg
+        msg = record.msg
+        msg = stderr.format(msg)
+        if record.levelno > 20:
+            record.msg = stderr.format(
+                '{X}{R}[WARNING]{c}{C}: {msg}', msg=msg)
         elif record.levelno > 10:
-            record.msg = '{}[INFO]{}:    '.format(
-                Err_Style.BRIGHT, Err_Style.RESET_ALL) + record.msg
+            record.msg = stderr.format(
+                '{X}[INFO]{C}:    {msg}', msg=msg)
         else:
-            record.msg = '{}{}[DEBUG]{}{}:   '.format(
-                Err_Style.BRIGHT, Err_Fore.LIGHTBLACK_EX, Err_Fore.RESET,
-                Err_Style.RESET_ALL) + record.msg
+            record.msg = stderr.format(
+                '{X}{k}[DEBUG]{c}{C}:    {msg}', msg=msg)
         return super(LevelDifferentiatingFormatter, self).format(record)
 
 logger = logging.getLogger('p4a')
@@ -122,42 +173,40 @@ warning = logger.warning
 error = logger.error
 
 
+def info_fmt(msg, **kwargs):
+    info(stderr.format(msg, **kwargs))
+
+
+def debug_fmt(msg, **kwargs):
+    debug(stderr.format(msg, **kwargs))
+
+
+def warning_dmt(msg, **kwargs):
+    warning(stderr.format(msg, **kwargs))
+
+
 IS_PY3 = sys.version_info[0] >= 3
 
-info(''.join(
-    [Err_Style.BRIGHT, Err_Fore.RED,
-     'This python-for-android revamp is an experimental alpha release!',
-     Err_Style.RESET_ALL]))
-info(''.join(
-    [Err_Fore.RED,
-     ('It should work (mostly), but you may experience '
-      'missing features or bugs.'),
-     Err_Style.RESET_ALL]))
+info_fmt('{X}{R}This python-for-android revamp is an experimental '
+         'alpha release!{C}')
+info_fmt('{R}It should work (mostly), but you may experience missing '
+         'features or bugs.{C}')
 
 
 def info_main(*args):
-    logger.info(''.join([Err_Style.BRIGHT, Err_Fore.GREEN] + list(args) +
-                        [Err_Style.RESET_ALL, Err_Fore.RESET]))
+    info_fmt('{X}{G}{args}{C}{c}', args=list(args))
 
 
 def info_notify(s):
-    info('{}{}{}{}'.format(Err_Style.BRIGHT, Err_Fore.LIGHTBLUE_EX, s,
-                           Err_Style.RESET_ALL))
+    info_fmt('{X}{b}{txt}{C}', txt=txt)
 
 
-def pretty_log_dists(dists, log_func=info):
-    infos = []
+def pretty_log_dists(dists, log_func=info_fmt):
     for dist in dists:
-        infos.append('{Fore.GREEN}{Style.BRIGHT}{name}{Style.RESET_ALL}: '
-                     'includes recipes ({Fore.GREEN}{recipes}'
-                     '{Style.RESET_ALL}), built for archs ({Fore.BLUE}'
-                     '{archs}{Style.RESET_ALL})'.format(
-                         name=dist.name, recipes=', '.join(dist.recipes),
-                         archs=', '.join(dist.archs) if dist.archs else 'UNKNOWN',
-                         Fore=Err_Fore, Style=Err_Style))
-
-    for line in infos:
-        log_func('\t' + line)
+        log_func(('\t{G}{X}{name}{C}: include recipes ({G}{recipes}{C})'
+                  ', built for archs ({B}{archs}{C})'),
+                 name=dist.name, recipes=', '.join(dist.recipes),
+                 archs=', '.join(dist.archs) if dist.archs else 'UNKNOWN')
 
 
 def shorten_string(string, max_width):
@@ -167,10 +216,10 @@ def shorten_string(string, max_width):
     string_len = len(string)
     if string_len <= max_width:
         return string
-    visible = max_width - 16 - int(log10(string_len))
     # expected suffix len "...(and XXXXX more)"
-    return ''.join((string[:visible], '...(and ', str(string_len - visible),
-                    ' more)'))
+    visible = max_width - 16 - int(log10(string_len))
+    return ''.join((string[:visible], '...(and ',
+                    str(string_len - visible), ' more)'))
 
 
 def shprint(command, *args, **kwargs):
@@ -196,10 +245,9 @@ def shprint(command, *args, **kwargs):
 
     # If logging is not in DEBUG mode, trim the command if necessary
     if logger.level > logging.DEBUG:
-        logger.info('{}{}'.format(shorten_string(string, columns - 12),
-                                  Err_Style.RESET_ALL))
+        info_fmt('{txt}{C}', txt=shorten_string(string, columns - 12))
     else:
-        logger.debug('{}{}'.format(string, Err_Style.RESET_ALL))
+        debug_fmt('{txt}{C}', txt=string)
 
     need_closing_newline = False
     try:
@@ -213,22 +261,18 @@ def shprint(command, *args, **kwargs):
                         '\t', ' ').replace(
                             '\b', ' ').rstrip()
                 if msg:
-                    sys.stdout.write(u'{}\r{}{:<{width}}'.format(
-                        Err_Style.RESET_ALL, msg_hdr,
-                        shorten_string(msg, msg_width), width=msg_width))
-                    sys.stdout.flush()
+                    stdout.p('{C}\r{hdr}{txt:<{width}}',
+                             hdr=msg_hdr,
+                             txt=shorten_string(msg, msg_width),
+                             width=msg_width, end='')
                     need_closing_newline = True
             else:
                 logger.debug(''.join(['\t', line.rstrip()]))
         if need_closing_newline:
-            sys.stdout.write('{}\r{:>{width}}\r'.format(
-                Err_Style.RESET_ALL, ' ', width=(columns - 1)))
-            sys.stdout.flush()
+            stdout.p('{C}\r{txt:>{width}}\r', txt=' ', width=columns-1, end='')
     except sh.ErrorReturnCode as err:
         if need_closing_newline:
-            sys.stdout.write('{}\r{:>{width}}\r'.format(
-                Err_Style.RESET_ALL, ' ', width=(columns - 1)))
-            sys.stdout.flush()
+            stdout.p('{C}\r{txt:>{width}}\r', txt=' ', width=columns-1, end='')
         if tail_n or filter_in or filter_out:
             def printtail(out, name, forecolor, tail_n=0,
                           re_filter_in=None, re_filter_out=None):
@@ -239,25 +283,27 @@ def shprint(command, *args, **kwargs):
                     lines = [l for l in lines if not re_filter_out.search(l)]
                 if tail_n == 0 or len(lines) <= tail_n:
                     info('{}:\n{}\t{}{}'.format(
-                        name, forecolor, '\t\n'.join(lines), Out_Fore.RESET))
+                        name, stderr._[forecolor], '\t\n'.join(lines),
+                        stderr._["c"]))
                 else:
                     info('{} (last {} lines of {}):\n{}\t{}{}'.format(
                         name, tail_n, len(lines),
-                        forecolor, '\t\n'.join(lines[-tail_n:]), Out_Fore.RESET))
-            printtail(err.stdout, 'STDOUT', Out_Fore.YELLOW, tail_n,
+                        stderr._[forecolor], '\t\n'.join(lines[-tail_n:]),
+                        stderr._["c"]))
+            printtail(err.stdout, 'STDOUT', "Y", tail_n,
                       re.compile(filter_in) if filter_in else None,
                       re.compile(filter_out) if filter_out else None)
-            printtail(err.stderr, 'STDERR', Err_Fore.RED)
+            printtail(err.stderr, 'STDERR', "R")
         if is_critical:
             env = kwargs.get("env")
             if env is not None:
-                info("{}ENV:{}\n{}\n".format(
-                    Err_Fore.YELLOW, Err_Fore.RESET, "\n".join(
-                        "set {}={}".format(n, v) for n, v in env.items())))
-            info("{}COMMAND:{}\ncd {} && {} {}\n".format(
-                Err_Fore.YELLOW, Err_Fore.RESET, getcwd(), command, ' '.join(args)))
-            warning("{}ERROR: {} failed!{}".format(
-                Err_Fore.RED, command, Err_Fore.RESET))
+                info_fmt(
+                    '{Y}ENV:{c}\n{txt}\n',
+                    txt='\n'.join(
+                        'set {}={}'.format(n, v) for n, v in env.items()))
+            info_fmt('{Y}COMMAND:{c}\ncd {cwd} && {cmd} {args}\n',
+                     cwd=getcwd(), cmd=command, args=' '.join(args))
+            warning_fmt('{R}ERROR: {cmd} failed!{c}', cmd=command)
             exit(1)
         else:
             raise
@@ -361,12 +407,10 @@ def which(program, path_env):
 @contextlib.contextmanager
 def current_directory(new_dir):
     cur_dir = getcwd()
-    logger.info(''.join((Err_Fore.CYAN, '-> directory context ', new_dir,
-                         Err_Fore.RESET)))
+    info_fmt('{CY}-> directory context {dir}{c}', dir=new_dir)
     chdir(new_dir)
     yield
-    logger.info(''.join((Err_Fore.CYAN, '<- directory context ', cur_dir,
-                         Err_Fore.RESET)))
+    info_fmt('{CY}<- directory context {dir}{c}', dir=cur_dir)
     chdir(cur_dir)
 
 
@@ -374,13 +418,11 @@ def current_directory(new_dir):
 def temp_directory():
     temp_dir = mkdtemp()
     try:
-        logger.debug(''.join((Err_Fore.CYAN, ' + temp directory used ',
-                              temp_dir, Err_Fore.RESET)))
+        debug_fmt('{CY} + temp directory created {dir}{c}', dir=temp_dir)
         yield temp_dir
     finally:
         shutil.rmtree(temp_dir)
-        logger.debug(''.join((Err_Fore.CYAN, ' - temp directory deleted ',
-                              temp_dir, Err_Fore.RESET)))
+        debug_fmt('{CY} - temp directory deleted {dir}{c}', dir=temp_dir)
 
 
 def cache_execution(f):
@@ -708,17 +750,18 @@ class Graph(object):
 
 
 class Context(object):
-    '''A build context. If anything will be built, an instance this class
+    '''A build context. If anything will be built, an instance of this class
     will be instantiated and used to hold all the build state.'''
 
     env = environ.copy()
     root_dir = None     # the filepath of toolchain.py
     storage_dir = None  # the root dir where builds and dists will be stored
 
-    build_dir = None  # in which bootstraps are copied for building and recipes are built
-    dist_dir = None  # the Android project folder where everything ends up
-    libs_dir = None  # where Android libs are cached after build but
-                     # before being placed in dists
+    build_dir = None    # in which bootstraps are copied for building and
+    #                   # recipes are built
+    dist_dir = None     # the Android project folder where everything ends up
+    libs_dir = None     # where Android libs are cached after build but
+    #                   # before being placed in dists
     aars_dir = None
     javaclass_dir = None
 
@@ -1589,6 +1632,7 @@ class Bootstrap(object):
             except sh.ErrorReturnCode_1:
                 logger.debug('Failed to strip ' + filen)
 
+
 class Recipe(object):
     url = None
     '''The address from which the recipe may be downloaded. This is not
@@ -1739,7 +1783,7 @@ class Recipe(object):
         info("Applying patch {}".format(filename))
         filename = join(self.recipe_dir, filename)
         shprint(sh.patch, "-t", "-d", self.get_build_dir(arch), "-p1",
-                   "-i", filename, _tail=10)
+                "-i", filename, _tail=10)
 
     def copy_file(self, filename, dest):
         info("Copy {} to {}".format(filename, dest))
@@ -2878,30 +2922,22 @@ build_dist
             for name in sorted(Recipe.list_recipes()):
                 recipe = Recipe.get_recipe(name, ctx)
                 version = str(recipe.version)
-                print('{Fore.BLUE}{Style.BRIGHT}{recipe.name:<12} '
-                      '{Style.RESET_ALL}{Fore.LIGHTBLUE_EX}'
-                      '{version:<8}{Style.RESET_ALL}'.format(
-                          recipe=recipe, Fore=Fore, Style=Style,
-                          version=version))
-                print('    {Fore.GREEN}depends: {recipe.depends}'
-                      '{Fore.RESET}'.format(recipe=recipe, Fore=Fore))
+                if not args.color:
+                    stdout.color_off()
+                stdout.p('{B}{X}{recipe.name:<12} {C}{b}{version:<8}{C}',
+                         recipe=recipe, version=version)
+                stdout.p('    {G}depends: {recipe.depends}{c}',
+                         recipe=recipe)
                 if recipe.conflicts:
-                    print('    {Fore.RED}conflicts: {recipe.conflicts}'
-                          '{Fore.RESET}'
-                          .format(recipe=recipe, Fore=Fore))
-                if recipe.opt_depends:
-                    print('    {Fore.YELLOW}optional depends: '
-                          '{recipe.opt_depends}{Fore.RESET}'
-                          .format(recipe=recipe, Fore=Fore))
+                    stdout.p('    {R}conflicts: {recipe.conflicts}{c}',
+                             recipe=recipe)
 
     def bootstraps(self, args):
         '''List all the bootstraps available to build with.'''
         for bs in Bootstrap.list_bootstraps():
             bs = Bootstrap.get_bootstrap(bs, self.ctx)
-            print('{Fore.BLUE}{Style.BRIGHT}{bs.name}{Style.RESET_ALL}'
-                  .format(bs=bs, Fore=Out_Fore, Style=Out_Style))
-            print('    {Fore.GREEN}depends: {bs.recipe_depends}{Fore.RESET}'
-                  .format(bs=bs, Fore=Out_Fore))
+            stdout.p('{B}{X}{bs.name}{C}', bs=bs)
+            stdout.p('    {G}depends: {bs.recipe_depends}{c}', bs=bs)
 
     def clean_all(self, args):
         '''Delete all build components; the package cache, package builds,
@@ -3119,12 +3155,10 @@ build_dist
         dists = Distribution.get_distributions(ctx)
 
         if dists:
-            print('{Style.BRIGHT}Distributions currently installed are:'
-                  '{Style.RESET_ALL}'.format(Style=Out_Style, Fore=Out_Fore))
-            pretty_log_dists(dists, print)
+            stdout.p('{X}Distributions currently installed are:{C}')
+            pretty_log_dists(dists, log_func=stdout.p)
         else:
-            print('{Style.BRIGHT}There are no dists currently built.'
-                  '{Style.RESET_ALL}'.format(Style=Out_Style))
+            stdout.p('{X}There are no dists currently built.{C}')
 
     def delete_dist(self, args):
         dist = self._dist
@@ -3183,29 +3217,23 @@ build_dist
         self.adb(['logcat'] + args)
 
     def build_status(self, args):
-
-        print('{Style.BRIGHT}Bootstraps whose core components are probably '
-              'already built:{Style.RESET_ALL}'.format(Style=Out_Style))
+        stdout.p('{X}Bootstraps whose core components are probably '
+                 'already built:{C}')
         for filen in os.listdir(join(self.ctx.build_dir, 'bootstrap_builds')):
-            print('    {Fore.GREEN}{Style.BRIGHT}{filen}{Style.RESET_ALL}'
-                  .format(filen=filen, Fore=Out_Fore, Style=Out_Style))
+            stdout.p('    {G}{X}{filen}{C}', filen=filen)
 
-        print('{Style.BRIGHT}Recipes that are probably already built:'
-              '{Style.RESET_ALL}'.format(Style=Out_Style))
+        stdout.p('{X}Recipes that are probably already built:{C}')
         if exists(join(self.ctx.build_dir, 'other_builds')):
             for filen in sorted(
                     os.listdir(join(self.ctx.build_dir, 'other_builds'))):
                 name = filen.split('-')[0]
                 dependencies = filen.split('-')[1:]
-                recipe_str = ('    {Style.BRIGHT}{Fore.GREEN}{name}'
-                              '{Style.RESET_ALL}'.format(
-                                  Style=Out_Style, name=name, Fore=Out_Fore))
+                recipe_str = stdout.format('    {X}{G}{name}{C}', name=name)
                 if dependencies:
-                    recipe_str += (
-                        ' ({Fore.BLUE}with ' + ', '.join(dependencies) +
-                        '{Fore.RESET})').format(Fore=Out_Fore)
-                recipe_str += '{Style.RESET_ALL}'.format(Style=Out_Style)
-                print(recipe_str)
+                    recipe_str += stdout.format(
+                        '({B}with {deps}{r}', deps=', '.join(dependencies))
+                recipe_str += stdout.format('{C}')
+                stdout.p_(recipe_str)
 
 
 def main():
