@@ -3256,12 +3256,16 @@ class ToolchainCL(Command):
             else:
                 stdout.p('{X}There are no dists currently built.{C}')
 
-    def delete_dist(self, args):
-        dist = self._dist
-        if dist.needs_build:
-            info('No dist exists that matches your specifications, '
-                 'exiting without deleting.')
-        shutil.rmtree(dist.dist_dir)
+    class delete_dist(SubCommand):
+        description = help = 'Delete a distribution.'
+
+        def run(self, args):
+            dist = self.tc._dist
+            if dist.needs_build:
+                info('No dist exists that matches your specifications, '
+                     'exiting without deleting.')
+                return
+            shutil.rmtree(dist.dist_dir)
 
     def sdk_tools(self, args):
         '''Runs the android binary from the detected SDK directory, passing
