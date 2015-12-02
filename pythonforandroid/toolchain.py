@@ -3319,10 +3319,14 @@ class ToolchainCL(Command):
                 stdout.write(line)
                 stdout.flush()
 
-    def logcat(self, args):
-        '''Runs ``adb logcat`` using the adb binary from the detected SDK
+    class logcat(adb):
+        description ='''Runs ``adb logcat`` using the adb binary from the
+        detected SDK
         directory. All extra args are passed as arguments to logcat.'''
-        self.adb(['logcat'] + args)
+        help = "Runs adb logcat from the SDK directory."
+
+        def run(self, args, unknown):
+            super(logcat, self).run(args, ['logcat']+unknown)
 
     def build_status(self, args):
         stdout.p('{X}Bootstraps whose core components are probably '
