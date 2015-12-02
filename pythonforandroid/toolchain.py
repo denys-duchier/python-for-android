@@ -3223,16 +3223,18 @@ class ToolchainCL(Command):
 
         # build_dist_from_args(ctx, dist, args)
 
-    def print_context_info(self, args):
-        '''Prints some debug information about which system paths
+    class print_context_info(SubCommand):
+        description = '''Prints some debug information about which system paths
         python-for-android will internally use for package building, along
         with information about where the Android SDK and NDK will be called
         from.'''
-        ctx = Context()
-        for attribute in ('root_dir', 'build_dir', 'dist_dir', 'libs_dir',
-                          'ccache', 'cython', 'sdk_dir', 'ndk_dir',
-                          'ndk_platform', 'ndk_ver', 'android_api'):
-            print('{} is {}'.format(attribute, getattr(ctx, attribute)))
+
+        def run(self, args):
+            ctx = Context()
+            for attribute in ('root_dir', 'build_dir', 'dist_dir', 'libs_dir',
+                              'ccache', 'cython', 'sdk_dir', 'ndk_dir',
+                              'ndk_platform', 'ndk_ver', 'android_api'):
+                print('{} is {}'.format(attribute, getattr(ctx, attribute)))
 
     def archs(self, args):
         '''List the target architectures available to be built for.'''
