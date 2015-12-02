@@ -3328,24 +3328,31 @@ class ToolchainCL(Command):
         def run(self, args, unknown):
             super(logcat, self).run(args, ['logcat']+unknown)
 
-    def build_status(self, args):
-        stdout.p('{X}Bootstraps whose core components are probably '
-                 'already built:{C}')
-        for filen in os.listdir(join(self.ctx.build_dir, 'bootstrap_builds')):
-            stdout.p('    {G}{X}{filen}{C}', filen=filen)
+    class build_status(SubCommand):
+        description = help = "Prints info about build status."
 
-        stdout.p('{X}Recipes that are probably already built:{C}')
-        if exists(join(self.ctx.build_dir, 'other_builds')):
-            for filen in sorted(
-                    os.listdir(join(self.ctx.build_dir, 'other_builds'))):
-                name = filen.split('-')[0]
-                dependencies = filen.split('-')[1:]
-                recipe_str = stdout.format('    {X}{G}{name}{C}', name=name)
-                if dependencies:
-                    recipe_str += stdout.format(
-                        '({B}with {deps}{r}', deps=', '.join(dependencies))
-                recipe_str += stdout.format('{C}')
-                stdout.p_(recipe_str)
+        def run(self, args):
+            ctx = self.tc.ctx
+
+            stdout.p('{X}Bootstraps whose core components are probably '
+                     'already built:{C}')
+            for filen in os.listdir(
+                    join(ctx.build_dir, 'bootstrap_builds')):
+                stdout.p('    {G}{X}{filen}{C}', filen=filen)
+
+            stdout.p('{X}Recipes that are probably already built:{C}')
+            if exists(join(ctx.build_dir, 'other_builds')):
+                for filen in sorted(
+                        os.listdir(join(ctx.build_dir, 'other_builds'))):
+                    name = filen.split('-')[0]
+                    dependencies = filen.split('-')[1:]
+                    recipe_str = stdout.format(
+                        '    {X}{G}{name}{C}', name=name)
+                    if dependencies:
+                        recipe_str += stdout.format(
+                            '({B}with {deps}{r}', deps=', '.join(dependencies))
+                    recipe_str += stdout.format('{C}')
+                    stdout.p_(recipe_str)
 
 
 def main():
