@@ -3236,28 +3236,25 @@ class ToolchainCL(Command):
                               'ndk_platform', 'ndk_ver', 'android_api'):
                 print('{} is {}'.format(attribute, getattr(ctx, attribute)))
 
-    def archs(self, args):
-        '''List the target architectures available to be built for.'''
-        print('{Style.BRIGHT}Available target architectures are:'
-              '{Style.RESET_ALL}'.format(Style=Out_Style))
-        for arch in self.ctx.archs:
-            print('    {}'.format(arch.arch))
+    # revisit this when aliases become widely supported
+    # def dists(self, args):
+    #     '''The same as :meth:`distributions`.'''
+    #     self.distributions(args)
 
-    def dists(self, args):
-        '''The same as :meth:`distributions`.'''
-        self.distributions(args)
+    class distributions(SubCommand):
+        description = '''Lists all distributions currently available
+        (i.e. that have already been built).'''
+        help = "List all currently available distributions."
 
-    def distributions(self, args):
-        '''Lists all distributions currently available (i.e. that have already
-        been built).'''
-        ctx = Context()
-        dists = Distribution.get_distributions(ctx)
+        def run(self, args):
+            ctx = Context()
+            dists = Distribution.get_distributions(ctx)
 
-        if dists:
-            stdout.p('{X}Distributions currently installed are:{C}')
-            pretty_log_dists(dists, log_func=stdout.p)
-        else:
-            stdout.p('{X}There are no dists currently built.{C}')
+            if dists:
+                stdout.p('{X}Distributions currently installed are:{C}')
+                pretty_log_dists(dists, log_func=stdout.p)
+            else:
+                stdout.p('{X}There are no dists currently built.{C}')
 
     def delete_dist(self, args):
         dist = self._dist
