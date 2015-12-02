@@ -3295,25 +3295,29 @@ class ToolchainCL(Command):
                 stdout.write(line)
                 stdout.flush()
 
-    def adb(self, args):
-        '''Runs the adb binary from the detected SDK directory, passing all
+    class adb(SubCommand):
+        description = '''Runs the adb binary from the detected SDK directory,
+        passing all
         arguments straight to it. This is intended as a convenience
         function if adb is not in your $PATH.
         '''
-        ctx = self.ctx
-        ctx.prepare_build_environment(user_sdk_dir=self.sdk_dir,
-                                      user_ndk_dir=self.ndk_dir,
-                                      user_android_api=self.android_api,
-                                      user_ndk_ver=self.ndk_version)
-        if platform in ('win32', 'cygwin'):
-            adb = sh.Command(join(ctx.sdk_dir, 'platform-tools', 'adb.exe'))
-        else:
-            adb = sh.Command(join(ctx.sdk_dir, 'platform-tools', 'adb'))
-        info_notify('Starting adb...')
-        output = adb(args, _iter=True, _out_bufsize=1, _err_to_out=True)
-        for line in output:
-            sys.stdout.write(line)
-            sys.stdout.flush()
+        help = 'Run the adb binary from the SDK directory.'
+        allow_unknown = True
+
+        def run(self, args, unknown):
+            ctx = self.tc.ctx
+            ctx.prepare_build_environment(
+                user_sdk_dir=self.tc.sdk_dir,
+                user_ndk_dir=self.tc.ndk_dir,
+                user_android_api=self.tc.android_api,
+                user_ndk_ver=self.tc.ndk_version)
+            exe = 'adb.exe' if platform in ('win32', 'cygwin') else 'adb'
+            adb = sh.Command(join(ctx.sdk_dir, 'platform-tools', exe))
+            info_notify('Starting adb...')
+            output = adb(*unknown, _iter=True, _out_bufsize=1, _err_to_out=True)
+            for line in output:
+                stdout.write(line)
+                stdout.flush()
 
     def logcat(self, args):
         '''Runs ``adb logcat`` using the adb binary from the detected SDK
