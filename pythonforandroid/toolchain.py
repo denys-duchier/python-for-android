@@ -3236,6 +3236,15 @@ class ToolchainCL(Command):
                               'ndk_platform', 'ndk_ver', 'android_api'):
                 print('{} is {}'.format(attribute, getattr(ctx, attribute)))
 
+    class archs(SubCommand):
+        description = help = (
+            'List the target architectures available to be built for.')
+
+        def run(self, args):
+            stdout.p('{X}Available target architectures are:{C}')
+            for arch in self.tc.ctx.archs:
+                stdout.p('    {arch}', arch=arch)
+
     # revisit this when aliases become widely supported
     # def dists(self, args):
     #     '''The same as :meth:`distributions`.'''
