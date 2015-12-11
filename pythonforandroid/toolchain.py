@@ -358,6 +358,7 @@ def require_prebuilt_dist(func):
                                       user_ndk_dir=self.tc.ndk_dir,
                                       user_android_api=self.tc.android_api,
                                       user_ndk_ver=self.tc.ndk_version)
+        ctx.set_archs(self.tc.archs)
         dist = self.tc._dist
         if dist.needs_build:
             info_notify('No dist exists that meets your requirements, '
@@ -2891,7 +2892,7 @@ class ToolchainCL(Command):
 
         # AND: This option doesn't really fit in the other categories, the
         # arg structure needs a rethink
-        parser.add_argument(
+        self.add_argument(
             '--arch',
             help='The archs to build for, separated by commas.',
             default='armeabi')
